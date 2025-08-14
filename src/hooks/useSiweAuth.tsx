@@ -55,8 +55,13 @@ export function SiweAuthProvider({ children }: AuthProviderProps) {
   const { switchChain, isPending: isSwitchingChain } = useSwitchChain()
   const { activeChain } = useActiveChain()
 
-  // Check if we're in mockup mode
-  const isMockupMode = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_MOCKUP_WALLET === 'true'
+  // Check if we're in mockup mode (support both development and production demo)
+  const [isMockupMode, setIsMockupMode] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return process.env.NEXT_PUBLIC_MOCKUP_WALLET === 'true' || 
+           process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
+           localStorage.getItem('pagent-demo-mode') === 'true'
+  })
 
   // Auth state
   const [isLoading, setIsLoading] = useState(true)

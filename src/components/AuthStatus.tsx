@@ -26,7 +26,7 @@ export function AuthStatus({ showDetails = false, className = '' }: AuthStatusPr
   } = useAuth()
   
   // Use mockup account data if in mockup mode, otherwise use real wallet
-  const isMockupMode = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_MOCKUP_WALLET === 'true'
+  const isMockupMode = process.env.NEXT_PUBLIC_MOCKUP_WALLET === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
   const mockupAccount = useMockupAccount()
   const realAccount = useAccount()
   

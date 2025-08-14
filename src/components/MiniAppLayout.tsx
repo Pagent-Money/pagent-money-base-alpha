@@ -7,6 +7,7 @@ import { useAccount } from 'wagmi'
 import { useAuth } from '../hooks/useAuth'
 import { Button } from './ui/Button'
 import { Loader2, Shield, LogOut } from 'lucide-react'
+import { DemoToggle } from './DemoToggle'
 
 interface MiniAppLayoutProps {
   children: ReactNode
@@ -136,6 +137,9 @@ export function MiniAppLayout({ children, title = "Pagent Credits", showWallet =
           </div>
         </div>
       </div>
+
+      {/* Demo Toggle for Live Testing */}
+      <DemoToggle />
     </div>
   )
 }

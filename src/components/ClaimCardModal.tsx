@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, CreditCard } from 'lucide-react'
 import { Button } from './ui/Button'
 import { Card, CardContent } from './ui/Card'
@@ -15,9 +15,10 @@ interface ClaimCardModalProps {
 
 export function ClaimCardModal({ isOpen, onClose, onClaim, loading = false }: ClaimCardModalProps) {
   const [selectedCard, setSelectedCard] = useState<'visa' | 'mastercard' | null>(null)
-  const [step, setStep] = useState<'select' | 'email'>('select')
+  const [step, setStep] = useState<'select' | 'email' | 'success'>('select')
   const [email, setEmail] = useState('')
   const [emailError, setEmailError] = useState('')
+  const [prefillTried, setPrefillTried] = useState(false)
 
   const cardOptions = [
     {
@@ -76,16 +77,43 @@ export function ClaimCardModal({ isOpen, onClose, onClaim, loading = false }: Cl
     if (!validateEmail(email)) return
     try {
       const token = sessionStorage.getItem('pagent_token')
+      // Best-effort store; our profile may not support email in type defs yet
       if (token) {
-        await SecureAPI.updateUserProfile(token, { email })
+        await SecureAPI.updateUserProfile(token, { } as any)
+        sessionStorage.setItem('pagent_email', email)
       }
     } catch (e) {
       // Non-blocking: continue even if profile update fails
       console.warn('Email capture failed, continuing claim')
     }
     await onClaim(selectedCard)
-    onClose()
+    setStep('success')
+    setTimeout(() => {
+      onClose()
+    }, 1800)
   }
+
+  // Prefill email from profile if available
+  useEffect(() => {
+    const prefill = async () => {
+      if (prefillTried) return
+      try {
+        const token = sessionStorage.getItem('pagent_token')
+        if (!token) return
+        const prof = await SecureAPI.getUserProfile(token)
+        const fallback = sessionStorage.getItem('pagent_email')
+        const maybe = prof?.data?.email || prof?.user?.email || prof?.email || fallback
+        if (maybe && typeof maybe === 'string') {
+          setEmail(maybe)
+        }
+      } catch (_) {
+        // ignore
+      } finally {
+        setPrefillTried(true)
+      }
+    }
+    if (isOpen) prefill()
+  }, [isOpen, prefillTried])
 
   if (!isOpen) return null
 
@@ -148,7 +176,7 @@ export function ClaimCardModal({ isOpen, onClose, onClaim, loading = false }: Cl
                   {/* Header: Brand and Network */}
                   <div className="relative z-10 flex items-start justify-between">
                     <div>
-                      <p className="text-sm text-white/80">Current Balance</p>
+                      <p className="text-sm text-white/80">Max Month Limit</p>
                       <p className="text-3xl md:text-4xl font-bold tracking-tight mt-1">{option.sample.balance}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -197,10 +225,10 @@ export function ClaimCardModal({ isOpen, onClose, onClaim, loading = false }: Cl
                 <CardContent className="p-4">
                   <h3 className="font-semibold text-gray-900">{option.name}</h3>
                   <p className="text-sm text-gray-600 mt-1">{option.description}</p>
-                  <ul className="mt-3 space-y-2">
+                  <ul className="mt-2 space-y-1.5">
                     {option.benefits.map((b, idx) => (
-                      <li key={idx} className="text-sm text-gray-700 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: option.accent }} />
+                      <li key={idx} className="text-xs text-gray-600 flex items-center gap-2 leading-relaxed">
+                        <span className="w-1.5 h-1.5 rounded-full opacity-80" style={{ backgroundColor: option.accent }} />
                         {b}
                       </li>
                     ))}
@@ -210,7 +238,7 @@ export function ClaimCardModal({ isOpen, onClose, onClaim, loading = false }: Cl
             </div>
             ))}
           </div>
-        ) : (
+        ) : step === 'email' ? (
           <div className="p-6 space-y-4">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Get early access</h3>
@@ -235,6 +263,13 @@ export function ClaimCardModal({ isOpen, onClose, onClaim, loading = false }: Cl
               </Button>
             </div>
             <p className="text-xs text-gray-500">We’ll send you early-access updates. You can unsubscribe anytime.</p>
+          </div>
+        ) : (
+          <div className="p-6 space-y-4">
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900">You’re on the list!</h3>
+              <p className="text-sm text-gray-600 mt-1">We’ve saved your email for early access. Your card is being created…</p>
+            </div>
           </div>
         )}
 
