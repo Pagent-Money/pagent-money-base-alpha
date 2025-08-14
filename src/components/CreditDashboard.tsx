@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 
 /**
  * Credit dashboard showing spending limits, usage, and status
- * 显示支出限制、使用情况和状态的信用仪表板
+ * Displays real-time credit information, transaction history, and account management
  */
 export function CreditDashboard({ onAssignCredits }: { onAssignCredits?: () => void }) {
   const { address } = useAccount()

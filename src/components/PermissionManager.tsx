@@ -15,7 +15,7 @@ import { Settings, Plus, X, Clock, Shield, AlertTriangle } from 'lucide-react'
 
 /**
  * Permission manager for creating and managing spend permissions
- * 用于创建和管理支出权限的权限管理器
+ * Component for creating and managing spend permissions with user-friendly interface
  */
 export function PermissionManager() {
   const { address } = useAccount()
@@ -54,7 +54,7 @@ export function PermissionManager() {
 
 /**
  * Active permission display card
- * 活动权限显示卡
+ * Card component displaying active spend permission details and controls
  */
 function ActivePermissionCard({ 
   permission, 

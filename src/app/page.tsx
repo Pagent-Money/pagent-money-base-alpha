@@ -15,7 +15,7 @@ import { motion } from 'framer-motion'
 
 /**
  * Loading screen to prevent hydration mismatch
- * 加载屏幕以防止水合不匹配
+ * Loading screen to prevent hydration mismatches and ensure smooth user experience
  */
 function LoadingScreen() {
   return (
@@ -40,7 +40,7 @@ function LoadingScreen() {
 
 /**
  * Main application page for Pagent Money
- * Pagent Money 的主应用程序页面
+ * Main application page for Pagent Credits with dashboard and navigation
  */
 export default function HomePage() {
   return (
@@ -101,7 +101,7 @@ function MainApp() {
 
 /**
  * Welcome screen for unauthenticated users
- * 未认证用户的欢迎屏幕
+ * Welcome screen for non-authenticated users with signup prompts
  */
 function WelcomeScreen() {
   const { isConnected } = useAccount()

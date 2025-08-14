@@ -5,7 +5,7 @@ import type { SpendPermission, SpendPermissionData } from '../types'
 
 /**
  * Hook for managing spend permissions
- * 管理支出权限的 Hook
+ * Manages spend permissions for Base Smart Accounts with USDC allowances
  */
 export function useSpendPermissions() {
   const { address } = useAccount()
@@ -14,7 +14,7 @@ export function useSpendPermissions() {
   const [error, setError] = useState<string | null>(null)
 
   // Get current active permission
-  // 获取当前活动权限
+  // Get currently active spend permission for the connected account
   const activePermission = permissions.find(p => 
     p.status === 'active' && 
     new Date(p.end_timestamp) > new Date()

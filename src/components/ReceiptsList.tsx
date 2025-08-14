@@ -10,7 +10,7 @@ import { useChainConfig } from '../hooks/useChainConfig'
 
 /**
  * Receipts list component showing transaction history
- * 显示交易历史的收据列表组件
+ * Displays transaction records with purchase details, merchant info, and status
  */
 export function ReceiptsList() {
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -166,7 +166,7 @@ export function ReceiptsList() {
 
 /**
  * Individual receipt card component
- * 单个收据卡组件
+ * Renders a single transaction receipt with status, amount, and merchant details
  */
 function ReceiptCard({ receipt }: { receipt: any }) {
   const getStatusIcon = (status: string) => {

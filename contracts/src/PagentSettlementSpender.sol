@@ -11,9 +11,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * @title PagentSettlementSpender
  * @dev Single entrypoint spender contract for Pagent credit card settlements
  * @dev Executes spend pipeline exactly as returned by prepareSpendCallData from Spend Permission Manager
- * 
- * 这个合约是 Pagent 信用卡结算的唯一入口点
- * 执行由 Spend Permission Manager 的 prepareSpendCallData 返回的支出管道
+ * @dev Handles authorization verification, replay protection, and treasury fund management
+ * @dev Supports pausable operations and authorized spender management for enhanced security
  */
 contract PagentSettlementSpender is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;

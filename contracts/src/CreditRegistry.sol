@@ -8,9 +8,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @title CreditRegistry
  * @dev Optional contract to mirror period usage for analytics and guardrails
  * @dev Provides a consistent view of spend permission usage across periods
- * 
- * 可选的合约，用于镜像周期使用情况，用于分析和护栏
- * 提供跨周期支出权限使用的一致视图
+ * @dev Enables tracking of credit limits, usage patterns, and period resets
+ * @dev Supports multiple time periods (daily, weekly, monthly) with automatic rollover
  */
 contract CreditRegistry is Ownable, ReentrancyGuard {
     

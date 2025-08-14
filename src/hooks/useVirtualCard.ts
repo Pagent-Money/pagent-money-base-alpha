@@ -5,7 +5,7 @@ import { SecureAPI } from '../lib/secure-auth'
 
 /**
  * Hook for managing virtual card operations
- * 管理虚拟卡操作的 Hook
+ * Manages virtual card operations including creation, limits, and transactions
  */
 export function useVirtualCard() {
   const { address } = useAccount()
@@ -16,7 +16,7 @@ export function useVirtualCard() {
 
   /**
    * Load user's virtual card from database and card vendor
-   * 从数据库和卡供应商加载用户的虚拟卡
+   * Loads user virtual cards from database and card vendor APIs
    */
   const loadCard = useCallback(async () => {
     if (!address) {
@@ -41,13 +41,13 @@ export function useVirtualCard() {
 
         if (cardId) {
           // Load card from vendor
-          // 从供应商加载卡
+          // Load cards from vendor API
           const cardData = await cardVendor.getCard(cardId)
           if (cardData) {
             setCard(cardData)
             
             // Load transactions
-            // 加载交易
+            // Load recent transactions
             const cardTransactions = await cardVendor.getCardTransactions(cardId)
             setTransactions(cardTransactions)
           }
@@ -63,7 +63,7 @@ export function useVirtualCard() {
 
   /**
    * Create a new virtual card for the user
-   * 为用户创建新的虚拟卡
+   * Creates a new virtual card for the user with specified limits
    */
   const createCard = useCallback(async (spendingLimit: number): Promise<{
     success: boolean
@@ -118,7 +118,7 @@ export function useVirtualCard() {
 
   /**
    * Update card spending limit
-   * 更新卡支出限制
+   * Updates spending limits for an existing virtual card
    */
   const updateSpendingLimit = useCallback(async (newLimit: number): Promise<{
     success: boolean
@@ -154,7 +154,7 @@ export function useVirtualCard() {
 
   /**
    * Block/unblock the card
-   * 冻结/解冻卡
+   * Freezes or unfreezes a virtual card
    */
   const toggleCardStatus = useCallback(async (): Promise<{
     success: boolean
@@ -191,7 +191,7 @@ export function useVirtualCard() {
 
   /**
    * Simulate a card transaction (for demo purposes)
-   * 模拟卡交易（用于演示目的）
+   * Simulates a card transaction for demo and testing purposes
    */
   const simulateTransaction = useCallback(async (
     amount: number,
@@ -222,7 +222,7 @@ export function useVirtualCard() {
       })
 
       // Update local transactions
-      // 更新本地交易
+      // Update local transaction state
       setTransactions(prev => [transaction, ...prev])
 
       return { success: true, transaction }
@@ -238,7 +238,7 @@ export function useVirtualCard() {
 
   /**
    * Format card number for display (masked)
-   * 格式化卡号以供显示（掩码）
+   * Formats card number for display with masking for security
    */
   const getDisplayCardNumber = useCallback((): string => {
     if (!card) return ''
@@ -248,7 +248,7 @@ export function useVirtualCard() {
 
   /**
    * Get card status color for UI
-   * 获取UI的卡状态颜色
+   * Returns appropriate color for card status in UI components
    */
   const getStatusColor = useCallback((): string => {
     if (!card) return 'text-gray-400'
@@ -268,7 +268,7 @@ export function useVirtualCard() {
   }, [card])
 
   // Load card when account changes
-  // 当账户更改时加载卡
+  // Load cards when account changes
   useEffect(() => {
     loadCard()
   }, [loadCard])

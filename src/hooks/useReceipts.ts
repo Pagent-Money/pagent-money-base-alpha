@@ -13,7 +13,7 @@ interface UseReceiptsParams {
 
 /**
  * Hook for managing receipts and transaction history
- * 管理收据和交易历史的 Hook
+ * Provides loading, pagination, and real-time updates for transaction records
  */
 export function useReceipts(params: UseReceiptsParams = {}) {
   const { address } = useAccount()
@@ -35,7 +35,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Load receipts for the connected account
-   * 为连接的账户加载收据
+   * Fetches transaction records with filtering and pagination support
    */
   const loadReceipts = useCallback(async (
     loadOffset = 0,
@@ -89,7 +89,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Load more receipts (pagination)
-   * 加载更多收据（分页）
+   * Appends additional transaction records to the existing list
    */
   const loadMore = useCallback(async () => {
     if (!hasMore || loading) return
@@ -98,7 +98,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Refresh receipts (reload from beginning)
-   * 刷新收据（从头重新加载）
+   * Clears current data and fetches fresh transaction records
    */
   const refresh = useCallback(async () => {
     setOffset(0)
@@ -107,7 +107,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Get receipts by status
-   * 按状态获取收据
+   * Filters receipts by transaction status
    */
   const getReceiptsByStatus = useCallback((targetStatus: string) => {
     return receipts.filter(receipt => receipt.status === targetStatus)
@@ -115,7 +115,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Get recent receipts (last 7 days)
-   * 获取最近的收据（最近7天）
+   * Returns receipts from the last 7 days
    */
   const getRecentReceipts = useCallback(() => {
     const sevenDaysAgo = new Date()
@@ -128,7 +128,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Format receipt amount for display
-   * 格式化收据金额以供显示
+   * Formats receipt amount for display with proper currency symbols
    */
   const formatAmount = useCallback((amount: number): string => {
     return new Intl.NumberFormat('en-US', {
@@ -140,7 +140,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Get status color for UI
-   * 获取UI的状态颜色
+   * Returns appropriate color for transaction status in UI
    */
   const getStatusColor = useCallback((status: string): string => {
     switch (status) {
@@ -159,7 +159,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
 
   /**
    * Format status for display
-   * 格式化状态以供显示
+   * Formats transaction status for user-friendly display
    */
   const formatStatus = useCallback((status: string): string => {
     switch (status) {
@@ -177,14 +177,14 @@ export function useReceipts(params: UseReceiptsParams = {}) {
   }, [])
 
   // Load receipts when dependencies change
-  // 当依赖项更改时加载收据
+  // Load receipts when dependencies change
   useEffect(() => {
     setOffset(0)
     loadReceipts(0, false)
   }, [loadReceipts])
 
   // Set up real-time subscription
-  // 设置实时订阅
+  // Set up real-time subscription for new transactions
   useEffect(() => {
     if (!address) return
 
@@ -200,7 +200,7 @@ export function useReceipts(params: UseReceiptsParams = {}) {
   }, [address])
 
   // Set up auto-refresh
-  // 设置自动刷新
+  // Set up auto-refresh interval for latest data
   useEffect(() => {
     if (!autoRefresh || !address) return
 

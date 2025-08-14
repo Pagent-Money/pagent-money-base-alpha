@@ -66,9 +66,8 @@ Our smart contract architecture is deployed and verified on **Base Sepolia Testn
  * @title CreditRegistry
  * @dev Optional contract to mirror period usage for analytics and guardrails
  * @dev Provides a consistent view of spend permission usage across periods
- * 
- * 可选的合约，用于镜像周期使用情况，用于分析和护栏
- * 提供跨周期支出权限使用的一致视图
+ * @dev Enables tracking of credit limits, usage patterns, and period resets
+ * @dev Supports multiple time periods (daily, weekly, monthly) with automatic rollover
  */
 ```
 
@@ -91,9 +90,8 @@ Our smart contract architecture is deployed and verified on **Base Sepolia Testn
  * @title PagentSettlementSpender
  * @dev Single entrypoint spender contract for Pagent credit card settlements
  * @dev Executes spend pipeline exactly as returned by prepareSpendCallData from Spend Permission Manager
- * 
- * 这个合约是 Pagent 信用卡结算的唯一入口点
- * 执行由 Spend Permission Manager 的 prepareSpendCallData 返回的支出管道
+ * @dev Handles authorization verification, replay protection, and treasury fund management
+ * @dev Supports pausable operations and authorized spender management for enhanced security
  */
 ```
 
