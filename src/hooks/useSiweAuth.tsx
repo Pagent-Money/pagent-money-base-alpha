@@ -56,37 +56,45 @@ export function SiweAuthProvider({ children }: AuthProviderProps) {
   const { activeChain } = useActiveChain()
 
   // Check if we're in mockup mode (support both development and production demo)
-  const [isMockupMode, setIsMockupMode] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return process.env.NEXT_PUBLIC_MOCKUP_WALLET === 'true' || 
-           process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
-           localStorage.getItem('pagent-demo-mode') === 'true'
-  })
+  const [isMockupMode, setIsMockupMode] = useState(false)
+
+  // Initialize mockup mode after hydration
+  useEffect(() => {
+    const mockupMode = process.env.NEXT_PUBLIC_MOCKUP_WALLET === 'true' || 
+                       process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
+                       localStorage.getItem('pagent-demo-mode') === 'true'
+    setIsMockupMode(mockupMode)
+    if (mockupMode) {
+      setIsAuthenticated(true)
+      setUser({
+        id: 'mockup-user-123',
+        address: '0x1234567890123456789012345678901234567890',
+        chainId: 8453,
+        isNewUser: false,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString()
+      })
+      setSession({
+        access_token: 'mock-jwt-token-' + Date.now(),
+        user: {
+          id: 'mockup-user-123',
+          address: '0x1234567890123456789012345678901234567890',
+          chainId: 8453,
+          isNewUser: false,
+          createdAt: new Date().toISOString(),
+          lastLoginAt: new Date().toISOString()
+        },
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      })
+    }
+  }, [])
 
   // Auth state
   const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(isMockupMode)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
-  const [user, setUser] = useState<SiweUser | null>(isMockupMode ? {
-    id: 'mockup-user-123',
-    address: '0x1234567890123456789012345678901234567890',
-    chainId: 8453,
-    isNewUser: false,
-    createdAt: new Date().toISOString(),
-    lastLoginAt: new Date().toISOString()
-  } : null)
-  const [session, setSession] = useState<SiweSession | null>(isMockupMode ? {
-    access_token: 'mock-jwt-token-' + Date.now(),
-    user: {
-      id: 'mockup-user-123',
-      address: '0x1234567890123456789012345678901234567890',
-      chainId: 8453,
-      isNewUser: false,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString()
-    },
-    expires_at: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-  } : null)
+  const [user, setUser] = useState<SiweUser | null>(null)
+  const [session, setSession] = useState<SiweSession | null>(null)
   const [isNewUser, setIsNewUser] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

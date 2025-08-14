@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/Card'
 export function DemoToggle() {
   const [isDemoMode, setIsDemoMode] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   useEffect(() => {
     // Show demo toggle in development or if demo mode is enabled
@@ -52,38 +52,40 @@ export function DemoToggle() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
-      <Card className={`border border-orange-200 bg-orange-50/95 backdrop-blur-sm shadow-lg transition-all duration-300 ${
-        isExpanded ? 'w-80' : 'w-auto'
-      }`}>
-        <CardHeader 
-          className="pb-2 cursor-pointer select-none hover:bg-orange-100/50 transition-colors rounded-t-lg"
+      {!isExpanded ? (
+        // Collapsed state: Just a minimal arrow icon
+        <div
+          className="w-10 h-10 bg-orange-50/95 backdrop-blur-sm border border-orange-200 rounded-full shadow-lg cursor-pointer hover:bg-orange-100/95 transition-all duration-300 flex items-center justify-center group"
           onClick={toggleExpanded}
         >
-          <CardTitle className="text-sm flex items-center justify-between text-orange-800">
-            <div className="flex items-center gap-2">
-              <TestTube className="w-4 h-4" />
-              <span>Demo Mode</span>
-              {!isExpanded && (
-                <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                  isDemoMode 
-                    ? 'bg-green-100 text-green-700 border border-green-200' 
-                    : 'bg-blue-100 text-blue-700 border border-blue-200'
-                }`}>
-                  {isDemoMode ? 'DEMO' : 'LIVE'}
-                </span>
-              )}
+          <ChevronUp className="w-5 h-5 text-orange-600 group-hover:text-orange-700" />
+          {/* Small status indicator dot with better visibility */}
+          <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white shadow-sm ${
+            isDemoMode ? 'bg-green-500' : 'bg-blue-500'
+          }`} />
+          {/* Tooltip text on hover */}
+          <div className="absolute bottom-12 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+            <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
+              {isDemoMode ? 'Demo Mode Active' : 'Live Mode Active'}
             </div>
-            {isExpanded ? (
-              <ChevronUp className="w-4 h-4 text-orange-600" />
-            ) : (
+          </div>
+        </div>
+      ) : (
+        // Expanded state: Full panel
+        <Card className="w-80 border border-orange-200 bg-orange-50/95 backdrop-blur-sm shadow-lg transition-all duration-300">
+          <CardHeader 
+            className="pb-2 cursor-pointer select-none hover:bg-orange-100/50 transition-colors rounded-t-lg"
+            onClick={toggleExpanded}
+          >
+            <CardTitle className="text-sm flex items-center justify-between text-orange-800">
+              <div className="flex items-center gap-2">
+                <TestTube className="w-4 h-4" />
+                <span>Demo Mode</span>
+              </div>
               <ChevronDown className="w-4 h-4 text-orange-600" />
-            )}
-          </CardTitle>
-        </CardHeader>
-        
-        <div className={`overflow-hidden transition-all duration-300 ${
-          isExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-        }`}>
+            </CardTitle>
+          </CardHeader>
+          
           <CardContent className="space-y-3 pt-0">
             <div className="text-xs text-orange-700">
               {isDemoMode ? (
@@ -123,8 +125,8 @@ export function DemoToggle() {
               <p><strong>Live Mode:</strong> Real Coinbase wallet required</p>
             </div>
           </CardContent>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   )
 }
