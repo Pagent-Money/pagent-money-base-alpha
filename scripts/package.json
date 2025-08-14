@@ -1,0 +1,14 @@
+{
+  "name": "siwe-auth-test",
+  "version": "1.0.0",
+  "description": "Test script for SIWE authentication",
+  "main": "test-siwe-auth-local.js",
+  "dependencies": {
+    "siwe": "^3.0.0",
+    "ethers": "^6.8.1",
+    "node-fetch": "^2.7.0"
+  },
+  "scripts": {
+    "test": "node test-siwe-auth-local.js"
+  }
+}
