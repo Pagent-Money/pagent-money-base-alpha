@@ -109,20 +109,28 @@ Our smart contract architecture is deployed and verified on **Base Sepolia Testn
 
 ```mermaid
 graph TB
-    A[👤 User Wallet] --> B[🔗 Base Smart Account]
-    B --> C[⚡ Spend Permissions]
-    C --> D[📋 CreditRegistry Contract]
-    C --> E[💳 PagentSettlementSpender Contract]
+    A[👤 User] --> B[📱 Pagent Credits App]
+    B --> C[🔗 Base Smart Account]
+    C --> D[⚡ Spend Permissions]
     
-    F[🛍️ Merchant Payment] --> G[🌐 Card Vendor API]
-    G --> H[☁️ Supabase Edge Functions]
-    H --> E
-    E --> I[💰 USDC Settlement]
-    I --> J[🏛️ Treasury]
+    D --> E[📋 CreditRegistry Contract]
+    D --> F[💳 PagentSettlementSpender Contract]
     
-    K[📱 Frontend Mini-App] --> B
-    K --> H
-    K --> L[📊 Real-time Dashboard]
+    G[🛍️ Online Purchase] --> H[💳 Virtual Credit Card]
+    H --> I[🌐 Payment Processing]
+    I --> F
+    
+    F --> J[💰 USDC Transfer]
+    J --> C
+    
+    B --> K[📊 Transaction History]
+    B --> L[⚙️ Permission Management]
+    B --> M[🎁 Cashback & Rewards]
+    
+    style A fill:#6B53FF,stroke:#FEA611,color:#fff
+    style C fill:#0052FF,stroke:#333,color:#fff
+    style F fill:#00D4AA,stroke:#333,color:#fff
+    style H fill:#FF6B35,stroke:#333,color:#fff
 ```
 
 **Technology Stack:**
