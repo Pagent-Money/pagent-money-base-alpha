@@ -75,21 +75,29 @@ export async function authenticateWithSiwe(
       nonce: siweMessage.nonce
     })
     
-    // DEBUG: Compare with test script format
-    console.log('🧪 DEBUG: Full message being sent:')
+    // Enhanced debugging information
+    console.log('🧪 DEBUG: Authentication request details:')
     console.log('=====================================')
     console.log('Message length:', message.length)
     console.log('Signature length:', signature.length)
+    console.log('Address:', siweMessage.address)
+    console.log('Chain ID:', siweMessage.chainId)
+    console.log('Domain:', siweMessage.domain)
+    console.log('Nonce:', siweMessage.nonce)
     console.log('Message preview:', message.substring(0, 100) + '...')
     console.log('Signature preview:', signature.substring(0, 20) + '...')
     console.log('=====================================')
     
-    // Test local verification like the test script
+    // Test local verification to help diagnose issues
     try {
       const localTest = await siweMessage.verify({ signature })
       console.log('🧪 Frontend local verification result:', localTest)
+      if (localTest && (localTest === true || localTest.success)) {
+        console.log('✅ Local verification passed - issue may be in backend')
+      }
     } catch (localError) {
       console.log('🧪 Frontend local verification error:', localError.message)
+      console.log('⚠️ This may indicate a Coinbase Smart Wallet signature that needs EIP-1271 verification')
     }
 
     // Send to our Edge Function for verification and user management
@@ -115,11 +123,30 @@ export async function authenticateWithSiwe(
       const errorText = await response.text()
       console.error('🚨 SIWE auth request failed:', response.status, errorText)
       
-      if (response.status === 404) {
-        throw new Error('Authentication service not available. Please try again later.')
+      // Parse error details if available
+      let errorDetails = errorText
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorDetails = errorJson.error || errorText
+      } catch (e) {
+        // Keep original text if not JSON
       }
       
-      throw new Error(`Authentication failed (${response.status}): ${errorText}`)
+      // Provide specific error messages for common issues
+      if (response.status === 401 && errorDetails.includes('Invalid signature')) {
+        throw new Error(
+          'Signature verification failed. This may be due to:\n' +
+          '• Coinbase Smart Wallet compatibility issues\n' +
+          '• Network connectivity problems\n' +
+          '• Please try again or contact support if the issue persists.'
+        )
+      } else if (response.status === 404) {
+        throw new Error('Authentication service not available. Please try again later.')
+      } else if (response.status === 400) {
+        throw new Error(`Invalid request: ${errorDetails}`)
+      } else {
+        throw new Error(`Authentication failed (${response.status}): ${errorDetails}`)
+      }
     }
 
     const result = await response.json()

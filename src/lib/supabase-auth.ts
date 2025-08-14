@@ -168,4 +168,49 @@ export function onAuthStateChange(callback: (event: string, session: any) => voi
   return supabase.auth.onAuthStateChange(callback)
 }
 
+// Global authenticated client (set after SIWE authentication)
+let authenticatedClient: any = null
+
+/**
+ * Set the Supabase JWT token for authenticated requests with RLS
+ * This should be called after successful SIWE authentication
+ */
+export async function setSupabaseToken(token: string): Promise<void> {
+  try {
+    // Create a new client with the custom JWT token
+    authenticatedClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    })
+    
+    console.log('✅ Supabase authenticated client created with JWT')
+  } catch (error) {
+    console.error('❌ Failed to set Supabase token:', error)
+    throw error
+  }
+}
+
+/**
+ * Get the authenticated Supabase client
+ * This client includes the JWT token for RLS enforcement
+ */
+export function getAuthenticatedClient() {
+  if (!authenticatedClient) {
+    console.warn('⚠️ No authenticated Supabase client available, falling back to anonymous client')
+    return supabase
+  }
+  return authenticatedClient
+}
+
+/**
+ * Clear the authenticated client (for logout)
+ */
+export function clearSupabaseToken(): void {
+  authenticatedClient = null
+  console.log('🚪 Supabase authenticated client cleared')
+}
+
 export { supabase }

@@ -2,7 +2,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { corsHeaders } from '../_shared/cors.ts'
 import { SiweMessage } from 'https://esm.sh/siwe@3.0.0'
-import { ethers } from 'https://esm.sh/ethers@6.8.1'
+import { verifyMessage, createPublicClient, http, isAddress } from 'https://esm.sh/viem@2.21.19'
+import { base, baseSepolia } from 'https://esm.sh/viem@2.21.19/chains'
 
 interface SiweAuthRequest {
   message: string
@@ -135,18 +136,23 @@ serve(async (req) => {
       address: siweMessage.address,
       chainId: siweMessage.chainId,
       domain: siweMessage.domain,
-      nonce: siweMessage.nonce
+      nonce: siweMessage.nonce,
+      messageLength: message.length,
+      signatureLength: signature.length
     })
     
-    // TEMPORARY DEBUG: Skip signature verification to test the rest of the flow
-    const SKIP_SIGNATURE_VERIFICATION = false // Set to true to test database flow
+    // ENHANCED DEBUG MODE: Can be enabled via environment variable for testing
+    const SKIP_SIGNATURE_VERIFICATION = Deno.env.get('SKIP_SIGNATURE_VERIFICATION') === 'true'
     
     let isValidSignature = false
     if (SKIP_SIGNATURE_VERIFICATION) {
-      console.log('⚠️ SKIPPING signature verification for debugging!')
+      console.log('⚠️ SKIPPING signature verification due to SKIP_SIGNATURE_VERIFICATION=true')
+      console.log('⚠️ This should ONLY be used for debugging - NEVER in production!')
       isValidSignature = true
     } else {
+      console.log('🔒 Performing signature verification...')
       isValidSignature = await verifySiweSignature(siweMessage, signature)
+      console.log('🔒 Signature verification result:', isValidSignature)
     }
     
     if (!isValidSignature) {
@@ -315,118 +321,75 @@ serve(async (req) => {
 })
 
 /**
- * Verify SIWE signature with support for both EOA and Smart Wallet (EIP-1271)
+ * Verify SIWE signature using viem with support for both EOA and Smart Wallet (EIP-1271)
+ * Enhanced for Coinbase Smart Wallet compatibility with ERC-6492 support
  */
 async function verifySiweSignature(
   siweMessage: SiweMessage,
   signature: string
 ): Promise<boolean> {
   try {
-    console.log('🔍 Starting SIWE signature verification...', {
+    console.log('🔍 Starting viem SIWE signature verification...', {
       address: siweMessage.address,
       chainId: siweMessage.chainId,
       signatureLength: signature.length
     })
-    
-    // DEBUG: Let's try the simplest possible verification first
-    console.log('🧪 DEBUG: Attempting basic SIWE verification...')
-    
+
+    // Validate address format
+    if (!isAddress(siweMessage.address)) {
+      console.error('❌ Invalid address format:', siweMessage.address)
+      return false
+    }
+
+    // Get the chain configuration
+    const chain = siweMessage.chainId === 8453 ? base : baseSepolia
+    const client = createPublicClient({
+      chain,
+      transport: http()
+    })
+
+    // Step 1: Try viem's built-in verifyMessage which handles both EOA and EIP-1271
+    console.log('🧪 Step 1: Using viem verifyMessage for comprehensive verification...')
     try {
-      // Try the most basic verification call
-      const basicResult = await siweMessage.verify({ signature })
-      console.log('🧪 Basic verification result:', basicResult)
-      console.log('🧪 Type of result:', typeof basicResult)
+      const messageToVerify = siweMessage.prepareMessage()
+      console.log('📝 Message being verified:', {
+        length: messageToVerify.length,
+        preview: messageToVerify.substring(0, 100) + '...'
+      })
+
+      const isValid = await verifyMessage(client, {
+        address: siweMessage.address as `0x${string}`,
+        message: messageToVerify,
+        signature: signature as `0x${string}`,
+      })
+
+      console.log('🎯 Viem verification result:', isValid)
       
-      if (basicResult && (basicResult === true || basicResult.success)) {
-        console.log('🎉 Basic verification succeeded!')
+      if (isValid) {
+        console.log('🎉 Viem SIWE verification succeeded!')
+        return true
+      }
+    } catch (viemError) {
+      console.log('🧪 Viem verification failed:', viemError.message)
+    }
+
+    // Step 2: Fallback to basic SIWE library verification for edge cases
+    console.log('🔄 Step 2: Fallback to basic SIWE verification...')
+    try {
+      const basicResult = await siweMessage.verify({ signature })
+      console.log('🧪 Basic SIWE verification result:', basicResult)
+      
+      // Handle different return types from SIWE library
+      if (basicResult === true || (typeof basicResult === 'object' && basicResult.success)) {
+        console.log('🎉 Fallback SIWE verification succeeded!')
         return true
       }
     } catch (basicError) {
-      console.log('🧪 Basic verification error:', basicError.message)
-      console.log('🧪 Full error:', basicError)
+      console.log('❌ Basic SIWE verification also failed:', basicError.message)
     }
 
-    // Try alternative verification approach
-    try {
-      console.log('🔄 Trying alternative verification...')
-      
-      // Manual verification using ethers
-      const messageToVerify = siweMessage.prepareMessage()
-      console.log('📝 Message to verify manually:', messageToVerify)
-      
-      const recoveredAddress = ethers.verifyMessage(messageToVerify, signature)
-      console.log('🔍 Recovered address:', recoveredAddress)
-      console.log('🔍 Expected address:', siweMessage.address)
-      
-      const isValid = recoveredAddress.toLowerCase() === siweMessage.address.toLowerCase()
-      console.log('🔍 Manual verification result:', isValid)
-      
-      if (isValid) {
-        console.log('🎉 Manual verification succeeded!')
-        return true
-      }
-    } catch (manualError) {
-      console.log('🔄 Manual verification error:', manualError.message)
-    }
-
-    // For Smart Wallets, we need to check if this is a contract address
-    // and verify using EIP-1271 if needed
-    // Select RPC provider based on chain ID
-    const rpcUrl = siweMessage.chainId === 8453 
-      ? 'https://mainnet.base.org' 
-      : 'https://sepolia.base.org'
-    const provider = new ethers.JsonRpcProvider(rpcUrl)
-    
-    try {
-      const code = await provider.getCode(siweMessage.address)
-      const isContract = code !== '0x'
-      
-      console.log('🏠 Address type:', {
-        address: siweMessage.address,
-        isContract,
-        codeLength: code.length
-      })
-
-      if (isContract) {
-        // This is a Smart Wallet - try EIP-1271 verification
-        console.log('🔧 Attempting EIP-1271 verification for Smart Wallet...')
-        return await verifyEIP1271Signature(siweMessage, signature, provider)
-      } else {
-        // EOA - try manual signature recovery
-        console.log('👤 EOA detected, trying manual verification...')
-        const messageToVerify = siweMessage.prepareMessage()
-        const recoveredAddress = ethers.verifyMessage(messageToVerify, signature)
-        const isValid = recoveredAddress.toLowerCase() === siweMessage.address.toLowerCase()
-        
-        console.log('🎯 Manual verification result:', {
-          expected: siweMessage.address.toLowerCase(),
-          recovered: recoveredAddress.toLowerCase(),
-          isValid
-        })
-        
-        return isValid
-      }
-    } catch (providerError) {
-      console.error('❌ Provider error during verification:', providerError)
-      
-      // Fallback: try basic ethers verification
-      try {
-        const messageToVerify = siweMessage.prepareMessage()
-        const recoveredAddress = ethers.verifyMessage(messageToVerify, signature)
-        const isValid = recoveredAddress.toLowerCase() === siweMessage.address.toLowerCase()
-        
-        console.log('🔄 Fallback verification result:', {
-          expected: siweMessage.address.toLowerCase(),
-          recovered: recoveredAddress.toLowerCase(),
-          isValid
-        })
-        
-        return isValid
-      } catch (fallbackError) {
-        console.error('❌ Fallback verification also failed:', fallbackError)
-        return false
-      }
-    }
+    console.log('❌ All verification methods failed')
+    return false
 
   } catch (error) {
     console.error('💥 SIWE signature verification error:', error)
@@ -434,48 +397,7 @@ async function verifySiweSignature(
   }
 }
 
-/**
- * Verify signature using EIP-1271 for Smart Wallets
- */
-async function verifyEIP1271Signature(
-  siweMessage: SiweMessage,
-  signature: string,
-  provider: ethers.Provider
-): Promise<boolean> {
-  try {
-    // EIP-1271 magic value for valid signature
-    const EIP1271_MAGIC_VALUE = '0x1626ba7e'
-    
-    // Contract ABI for isValidSignature
-    const abi = [
-      'function isValidSignature(bytes32 hash, bytes signature) view returns (bytes4)'
-    ]
-    
-    const contract = new ethers.Contract(siweMessage.address, abi, provider)
-    const messageToVerify = siweMessage.prepareMessage()
-    const messageHash = ethers.hashMessage(messageToVerify)
-    
-    console.log('🔧 EIP-1271 verification attempt:', {
-      contractAddress: siweMessage.address,
-      messageHash,
-      signature
-    })
-    
-    const result = await contract.isValidSignature(messageHash, signature)
-    const isValid = result === EIP1271_MAGIC_VALUE
-    
-    console.log('🎯 EIP-1271 verification result:', {
-      result,
-      expected: EIP1271_MAGIC_VALUE,
-      isValid
-    })
-    
-    return isValid
-  } catch (error) {
-    console.error('❌ EIP-1271 verification failed:', error)
-    return false
-  }
-}
+
 
 /**
  * Generate JWT token using Supabase-compatible format

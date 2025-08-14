@@ -65,20 +65,22 @@ export function SiweAuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<SiweUser | null>(isMockupMode ? {
     id: 'mockup-user-123',
     address: '0x1234567890123456789012345678901234567890',
+    chainId: 8453,
     isNewUser: false,
     createdAt: new Date().toISOString(),
-    lastActiveAt: new Date().toISOString()
+    lastLoginAt: new Date().toISOString()
   } : null)
   const [session, setSession] = useState<SiweSession | null>(isMockupMode ? {
-    id: 'mockup-session-123',
+    access_token: 'mock-jwt-token-' + Date.now(),
     user: {
       id: 'mockup-user-123',
       address: '0x1234567890123456789012345678901234567890',
+      chainId: 8453,
       isNewUser: false,
       createdAt: new Date().toISOString(),
-      lastActiveAt: new Date().toISOString()
+      lastLoginAt: new Date().toISOString()
     },
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
+    expires_at: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
   } : null)
   const [isNewUser, setIsNewUser] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -137,15 +139,16 @@ export function SiweAuthProvider({ children }: AuthProviderProps) {
       const mockUser: SiweUser = {
         id: 'mockup-user-123',
         address: '0x1234567890123456789012345678901234567890',
+        chainId: 8453,
         isNewUser: false,
         createdAt: new Date().toISOString(),
-        lastActiveAt: new Date().toISOString()
+        lastLoginAt: new Date().toISOString()
       }
       
       const mockSession: SiweSession = {
-        id: 'mockup-session-123',
+        access_token: 'mock-jwt-token-' + Date.now(),
         user: mockUser,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        expires_at: Date.now() + 24 * 60 * 60 * 1000
       }
       
       setSession(mockSession)
@@ -256,6 +259,13 @@ export function SiweAuthProvider({ children }: AuthProviderProps) {
       if (result.success && result.session) {
         console.log('✅ SIWE authentication successful!', result.session.user.isNewUser ? '(New user)' : '(Returning user)')
         
+        // Set the Supabase auth token for RLS
+        if (result.session.token) {
+          const supabaseAuth = await import('../lib/supabase-auth')
+          await supabaseAuth.setSupabaseToken(result.session.token)
+          console.log('🔑 Supabase JWT token set for RLS')
+        }
+        
         // Update state
         setSession(result.session)
         setUser(result.session.user)
@@ -297,6 +307,10 @@ export function SiweAuthProvider({ children }: AuthProviderProps) {
   const logout = async () => {
     try {
       console.log('🚪 Signing out from SIWE...')
+      
+      // Clear Supabase token
+      const supabaseAuth = await import('../lib/supabase-auth')
+      supabaseAuth.clearSupabaseToken()
       
       // Clear session
       clearSiweSession()

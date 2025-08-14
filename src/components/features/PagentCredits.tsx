@@ -17,10 +17,13 @@ import { useAccount } from 'wagmi'
 import { CreatePermissionModal } from '../CreatePermissionModal'
 import { ClientOnly } from '../ClientOnly'
 import { CreditCardMini } from '../CreditCardMini'
+import { useAuth } from '../../hooks/useAuth'
+import { SecureAPI } from '../../lib/secure-auth'
 
 export function PagentCredits() {
   const { activePermission, permissions, revokePermission, loading: permissionLoading } = useSpendPermissions()
   const { address, isConnected } = useAccount()
+  const { session, isAuthenticated } = useAuth()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creditLimit, setCreditLimit] = useState<number>(0)
   const [usedAmount, setUsedAmount] = useState<number>(0)
@@ -32,31 +35,37 @@ export function PagentCredits() {
 
   useEffect(() => {
     const load = async () => {
-      if (!isConnected || !address) {
+      if (!isConnected || !address || !isAuthenticated || !session) {
         setCreditLimit(0)
         setUsedAmount(0)
         setCardEligible(false)
         return
       }
       try {
-        const res = await fetch(`/api/credits?address=${address}`)
-        if (!res.ok) return
-        const json = await res.json()
-        const ap = json?.data?.activePermission
-        const txs = json?.data?.transactions || []
-        if (ap?.cap_amount) {
-          const limit = Number(ap.cap_amount) / 100 // Convert from cents
-          setCreditLimit(limit)
-          setCardEligible(limit >= 100) // $100 minimum for card
+        console.log('🔄 Loading credits data...')
+        const result = await SecureAPI.getCredits(session.access_token)
+        
+        if (result.success && result.data) {
+          const { activePermission, creditLimit: limit, usedAmount: used } = result.data
+          
+          if (limit) {
+            setCreditLimit(Number(limit))
+            setCardEligible(Number(limit) >= 100) // $100 minimum for card
+          }
+          
+          if (used !== undefined) {
+            setUsedAmount(Number(used))
+          }
+          
+          console.log('✅ Credits data loaded:', { limit, used, hasActive: !!activePermission })
         }
-        const total = txs.reduce((s: number, t: any) => s + (t.amount || 0), 0) / 100
-        setUsedAmount(Number(total))
-      } catch (_) {
+      } catch (error) {
+        console.error('❌ Failed to load credits data:', error)
         // keep defaults on failure
       }
     }
     load()
-  }, [isConnected, address, activePermission])
+  }, [isConnected, address, isAuthenticated, session, activePermission])
 
   const handleRevokePermission = async () => {
     if (!activePermission) return

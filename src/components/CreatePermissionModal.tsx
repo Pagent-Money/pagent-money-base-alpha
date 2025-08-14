@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from './ui/Card'
 import { Button } from './ui/Button'
 import { X, AlertCircle, CheckCircle } from 'lucide-react'
 import { formatCurrency } from '../lib/utils'
+import { useAuth } from '../hooks/useAuth'
+import { SecureAPI } from '../lib/secure-auth'
 
 interface CreatePermissionModalProps {
   onClose: () => void
@@ -15,6 +17,7 @@ interface CreatePermissionModalProps {
 export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionModalProps) {
   const { address } = useAccount()
   const { signMessage, isPending: isSigning } = useSignMessage()
+  const { session, isAuthenticated } = useAuth()
   
   const [step, setStep] = useState<'form' | 'signing' | 'creating'>('form')
   const [mode, setMode] = useState<'recurring' | 'topup'>('recurring')
@@ -36,7 +39,10 @@ export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionMo
   }
 
   const handleSubmit = async () => {
-    if (!address) return
+    if (!address || !isAuthenticated || !session) {
+      setError('Please ensure you are connected and authenticated')
+      return
+    }
     
     setError('')
     setStep('signing')
@@ -59,22 +65,19 @@ export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionMo
       
       setStep('creating')
       
-      // Create permission via API
-      const response = await fetch('/api/credits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address,
-          creditLimit: amount * 100, // Convert to cents
-          period: mode === 'recurring' ? Number(period) : 0, // 0 for one-time top-up
-          mode,
-          signature
-        })
-      })
+      // Create permission via authenticated API call to Supabase Edge Function
+      // Note: Using placeholder values for blockchain integration
+      const permissionData = {
+        tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+        capAmount: amount * 100, // Convert to cents 
+        periodSeconds: mode === 'recurring' ? Number(period) : 31536000, // 1 year for one-time
+        spenderAddress: '0x0000000000000000000000000000000000000000', // Placeholder for contract address
+        permissionSignature: signature
+      }
       
-      const result = await response.json()
+      const result = await SecureAPI.createPermission(session.access_token, permissionData)
       
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.error || 'Failed to assign credits')
       }
       
@@ -82,6 +85,7 @@ export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionMo
       onClose()
       
     } catch (err: any) {
+      console.error('Credits assignment error:', err)
       setError(err.message || 'Failed to assign credits')
       setStep('form')
     }
@@ -99,8 +103,8 @@ export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionMo
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md max-h-[90vh] border-0 shadow-2xl rounded-3xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pb-20 sm:pb-16">
+      <Card className="w-full max-w-md max-h-[calc(100vh-10rem)] sm:max-h-[calc(100vh-8rem)] min-h-0 border-0 shadow-2xl rounded-3xl flex flex-col overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Assign Spend Credits</CardTitle>
@@ -112,7 +116,7 @@ export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionMo
             </button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4 flex-1 overflow-y-auto">
+        <CardContent className="space-y-4 flex-1 overflow-y-auto px-6 py-4">
           {step === 'form' && (
             <>
               {/* Mode Selection */}
@@ -242,7 +246,7 @@ export function CreatePermissionModal({ onClose, onSuccess }: CreatePermissionMo
           )}
         </CardContent>
         {step === 'form' && (
-          <CardFooter className="gap-3 border-t">
+          <CardFooter className="gap-3 border-t px-6 py-4 mt-auto">
             <Button
               onClick={handleSubmit}
               disabled={!creditAmount || Number(creditAmount) < getAmountRange().min || Number(creditAmount) > getAmountRange().max}

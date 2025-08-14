@@ -14,9 +14,14 @@ import {
   Eye,
   EyeOff,
   ShoppingBag,
-  ArrowRight
+  ArrowRight,
+  Settings,
+  Receipt
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/Tabs'
+import { Button } from '../ui/Button'
+import { ClaimCardModal } from '../ClaimCardModal'
 import { useVirtualCard } from '../../hooks/useVirtualCard'
 import { formatCurrency } from '../../lib/utils'
 
@@ -25,17 +30,18 @@ export function PagentCard() {
   const [isCardActive, setIsCardActive] = useState(true)
   const { card, createCard, loading } = useVirtualCard()
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [showClaimModal, setShowClaimModal] = useState(false)
 
-  // Mock card data
+  // Mock card data - use 0 balance and limit if no card exists
   const cardData = {
-    number: '4532 •••• •••• 8976',
-    fullNumber: '4532 1234 5678 8976',
+    number: card ? '4532 •••• •••• 8976' : '•••• •••• •••• ••••',
+    fullNumber: card ? '4532 1234 5678 8976' : '•••• •••• •••• ••••',
     holder: 'JOHN DOE',
-    expiry: '12/26',
-    cvv: '123',
+    expiry: card ? '12/26' : '••/••',
+    cvv: card ? '123' : '•••',
     type: 'visa',
-    balance: 1250.00,
-    limit: 5000.00
+    balance: card ? 1250.00 : 0,
+    limit: card ? (card.spending_limit || 5000.00) : 0
   }
 
   const linkedServices = [
@@ -55,6 +61,17 @@ export function PagentCard() {
     navigator.clipboard.writeText(text)
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  const handleClaimCard = async (cardType: 'visa' | 'mastercard') => {
+    try {
+      // Create card with default spending limit based on card type
+      const defaultLimit = cardType === 'visa' ? 5000 : 7500
+      await createCard(defaultLimit)
+      setShowClaimModal(false)
+    } catch (error) {
+      console.error('Failed to claim card:', error)
+    }
   }
 
   return (
@@ -78,17 +95,19 @@ export function PagentCard() {
                 <p className="text-2xl font-bold">Pagent Card</p>
               </div>
               <div className="flex items-center gap-2">
-                {cardData.type === 'visa' && (
+                {cardData.type === 'visa' && card && (
                   <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded">
                     <span className="text-xl font-bold">VISA</span>
                   </div>
                 )}
-                <button
-                  onClick={() => setShowCardDetails(!showCardDetails)}
-                  className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
-                >
-                  {showCardDetails ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+                {card && (
+                  <button
+                    onClick={() => setShowCardDetails(!showCardDetails)}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    {showCardDetails ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -97,17 +116,19 @@ export function PagentCard() {
               <p className="text-xs text-white/60 mb-1">Card Number</p>
               <div className="flex items-center gap-3">
                 <p className="text-xl font-mono tracking-wider">
-                  {showCardDetails ? cardData.fullNumber : cardData.number}
+                  {showCardDetails && card ? cardData.fullNumber : cardData.number}
                 </p>
-                <button
-                  onClick={() => copyToClipboard(cardData.fullNumber, 'number')}
-                  className="p-1 hover:bg-white/10 rounded transition-colors"
-                >
-                  {copiedField === 'number' ? 
-                    <Check className="w-4 h-4 text-green-400" /> : 
-                    <Copy className="w-4 h-4" />
-                  }
-                </button>
+                {card && (
+                  <button
+                    onClick={() => copyToClipboard(cardData.fullNumber, 'number')}
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                  >
+                    {copiedField === 'number' ? 
+                      <Check className="w-4 h-4 text-green-400" /> : 
+                      <Copy className="w-4 h-4" />
+                    }
+                  </button>
+                )}
               </div>
             </div>
 
@@ -115,13 +136,13 @@ export function PagentCard() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-xs text-white/60 mb-1">Card Holder</p>
-                <p className="font-medium">{cardData.holder}</p>
+                <p className="font-medium">{card ? cardData.holder : '••••••••'}</p>
               </div>
               <div>
                 <p className="text-xs text-white/60 mb-1">Expires</p>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">{showCardDetails ? cardData.expiry : '••/••'}</p>
-                  {showCardDetails && (
+                  <p className="font-medium">{showCardDetails && card ? cardData.expiry : '••/••'}</p>
+                  {showCardDetails && card && (
                     <button
                       onClick={() => copyToClipboard(cardData.expiry, 'expiry')}
                       className="p-1 hover:bg-white/10 rounded transition-colors"
@@ -137,8 +158,8 @@ export function PagentCard() {
               <div>
                 <p className="text-xs text-white/60 mb-1">CVV</p>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium">{showCardDetails ? cardData.cvv : '•••'}</p>
-                  {showCardDetails && (
+                  <p className="font-medium">{showCardDetails && card ? cardData.cvv : '•••'}</p>
+                  {showCardDetails && card && (
                     <button
                       onClick={() => copyToClipboard(cardData.cvv, 'cvv')}
                       className="p-1 hover:bg-white/10 rounded transition-colors"
@@ -162,150 +183,213 @@ export function PagentCard() {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-white/60">Credit Limit</p>
-                  <p className="text-lg">{formatCurrency(card?.spending_limit ?? cardData.limit)}</p>
+                  <p className="text-lg">{formatCurrency(cardData.limit)}</p>
                 </div>
               </div>
             </div>
+
+            {/* No Card State - Claim Button */}
+            {!card && (
+              <div className="mt-6 pt-6 border-t border-white/20 text-center">
+                <p className="text-white/80 mb-4">You don't have a virtual card yet</p>
+                <Button
+                  onClick={() => setShowClaimModal(true)}
+                  className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white border border-white/30"
+                  disabled={loading}
+                >
+                  {loading ? 'Creating...' : 'Claim a Virtual Credit Card'}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Card Status Toggle */}
-        <div className="absolute top-4 right-4">
-          <button
-            onClick={() => setIsCardActive(!isCardActive)}
-            className={`px-4 py-2 rounded-full font-medium text-sm transition-all ${
-              isCardActive 
-                ? 'bg-green-500 text-white hover:bg-green-600' 
-                : 'bg-gray-400 text-white hover:bg-gray-500'
-            }`}
-          >
-            {isCardActive ? 'Active' : 'Frozen'}
-          </button>
-        </div>
+        {/* Card Status Toggle - Only show if card exists */}
+        {card && (
+          <div className="absolute top-4 right-4">
+            <button
+              onClick={() => setIsCardActive(!isCardActive)}
+              className={`px-4 py-2 rounded-full font-medium text-sm transition-all ${
+                isCardActive 
+                  ? 'bg-green-500 text-white hover:bg-green-600' 
+                  : 'bg-gray-400 text-white hover:bg-gray-500'
+              }`}
+            >
+              {isCardActive ? 'Active' : 'Frozen'}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="hover:shadow-lg transition-all cursor-pointer group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg">
-                <Plus className="w-6 h-6 text-purple-600" />
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-            </div>
-            <h3 className="font-semibold mb-1">Enable Pagent Card</h3>
-            <p className="text-sm text-muted-foreground">Requires active $100+ spend permission</p>
-            <div className="mt-4">
-              <button
-                disabled={!!card || loading}
-                onClick={async () => { await createCard(5000) }}
-                className="px-4 py-2 rounded-lg text-white bg-gradient-to-r from-[#6B53FF] to-[#FEA611] disabled:opacity-50"
-              >
-                {card ? 'Card Enabled' : (loading ? 'Creating...' : 'Enable')}
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Only show tabs if user has a card */}
+      {card ? (
+        <Tabs defaultValue="services" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100">
+            <TabsTrigger value="services" className="flex items-center gap-2">
+              <Link2 className="w-4 h-4" />
+              Services linked
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="flex items-center gap-2">
+              <Receipt className="w-4 h-4" />
+              Transactions
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Settings
+            </TabsTrigger>
+          </TabsList>
 
-        <Card className="hover:shadow-lg transition-all cursor-pointer group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-pink-100 to-orange-100 dark:from-pink-900/30 dark:to-orange-900/30 rounded-lg">
-                <Link2 className="w-6 h-6 text-pink-600" />
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-            </div>
-            <h3 className="font-semibold mb-1">Link Services</h3>
-            <p className="text-sm text-muted-foreground">Connect to payment platforms</p>
-          </CardContent>
-        </Card>
+          {/* Linked Services Tab */}
+          <TabsContent value="services">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Link2 className="w-5 h-5" />
+                  Linked Services
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {linkedServices.map((service) => (
+                    <div key={service.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{service.icon}</span>
+                        <div>
+                          <p className="font-medium text-sm">{service.name}</p>
+                          <p className="text-xs text-gray-500">Last used: {service.lastUsed}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          service.status === 'active' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {service.status}
+                        </span>
+                        <button className="p-1 hover:bg-gray-200 rounded">
+                          <Settings className="w-4 h-4 text-gray-600" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <button className="w-full mt-4 p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-gray-400 hover:text-gray-700 transition-colors flex items-center justify-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add New Service
+                </button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <Card className="hover:shadow-lg transition-all cursor-pointer group">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-3 bg-gradient-to-br from-orange-100 to-yellow-100 dark:from-orange-900/30 dark:to-yellow-900/30 rounded-lg">
-                <Shield className="w-6 h-6 text-orange-600" />
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-            </div>
-            <h3 className="font-semibold mb-1">Security Settings</h3>
-            <p className="text-sm text-muted-foreground">Manage card limits and controls</p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Settings Tab */}
+          <TabsContent value="settings">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5" />
+                  Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Smartphone className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="font-medium text-sm">2FA Authentication</p>
+                        <p className="text-xs text-gray-500">Secure your account with two-factor auth</p>
+                      </div>
+                    </div>
+                    <button className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      Enabled
+                    </button>
+                  </div>
 
-      {/* Linked Services */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Link2 className="w-5 h-5" />
-              Linked Services
-            </span>
-            <button className="text-sm text-primary hover:underline">Manage</button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {linkedServices.map((service) => (
-              <div key={service.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{service.icon}</span>
-                  <div>
-                    <p className="font-medium">{service.name}</p>
-                    <p className="text-xs text-muted-foreground">Last used: {service.lastUsed}</p>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Globe className="w-5 h-5 text-purple-600" />
+                      <div>
+                        <p className="font-medium text-sm">Online Transactions</p>
+                        <p className="text-xs text-gray-500">Allow card usage for online purchases</p>
+                      </div>
+                    </div>
+                    <button className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      Allowed
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <ShoppingBag className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium text-sm">Purchase Notifications</p>
+                        <p className="text-xs text-gray-500">Get notified of all transactions</p>
+                      </div>
+                    </div>
+                    <button className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      On
+                    </button>
                   </div>
                 </div>
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  service.status === 'active'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                }`}>
-                  {service.status}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-      {/* Recent Transactions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5" />
-            Recent Card Transactions
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {recentTransactions.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 rounded-lg flex items-center justify-center">
-                    <CreditCard className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium">{tx.merchant}</p>
-                    <p className="text-xs text-muted-foreground">{tx.date}</p>
-                  </div>
+          {/* Transactions Tab */}
+          <TabsContent value="transactions">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Recent Transactions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {recentTransactions.map((transaction) => (
+                    <div key={transaction.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <ShoppingBag className="w-5 h-5 text-gray-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{transaction.merchant}</p>
+                          <p className="text-xs text-gray-500">{transaction.date}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">-{formatCurrency(transaction.amount)}</p>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          transaction.status === 'completed' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {transaction.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">-{formatCurrency(tx.amount)}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    tx.status === 'completed'
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                  }`}>
-                    {tx.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                
+                <button className="w-full mt-4 p-3 text-center text-blue-600 hover:text-blue-700 transition-colors flex items-center justify-center gap-2">
+                  View All Transactions
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      ) : null}
+
+      {/* Claim Card Modal */}
+      <ClaimCardModal
+        isOpen={showClaimModal}
+        onClose={() => setShowClaimModal(false)}
+        onClaim={handleClaimCard}
+        loading={loading}
+      />
     </div>
   )
 }
