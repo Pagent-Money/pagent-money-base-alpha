@@ -46,8 +46,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
-  const prefix = basePath ? (basePath.startsWith('/') ? basePath : `/${basePath}`) : ''
+  // Remove basePath dependency for cleaner deployment
+  const prefix = ''
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

@@ -4,10 +4,11 @@ import { useAuth } from '../hooks/useSiweAuth'
 import { AuthStatus } from '../components/AuthStatus'
 import { CreditDashboard } from '../components/CreditDashboard'
 import { ClientOnly } from '../components/ClientOnly'
+import { WaitlistModal } from '../components/WaitlistModal'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import OnboardingCarousel from '../components/OnboardingCarousel'
-import { CreditCard, Wallet, ShieldCheck, ShoppingBag, Check, Play, ArrowRight, Zap, RefreshCw, FileText } from 'lucide-react'
+import { CreditCard, Wallet, ShieldCheck, ShoppingBag, Check, Play, ArrowRight, Zap, RefreshCw, FileText, Mail } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAccount } from 'wagmi'
@@ -106,6 +107,7 @@ function MainApp() {
 function WelcomeScreen() {
   const { isConnected } = useAccount()
   const [allowanceAmount, setAllowanceAmount] = useState(72)
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
 
   // Count-up animation for allowance
   useEffect(() => {
@@ -174,7 +176,17 @@ function WelcomeScreen() {
                 transition={{ duration: 0.6, delay: 0.3 }}
                 className="flex flex-col sm:flex-row gap-4"
               >
-                <AuthStatus />
+                <Button
+                  onClick={() => {
+                    console.log('Debug - Join the Waitlist button clicked')
+                    setShowWaitlistModal(true)
+                  }}
+                  size="lg"
+                  className="bg-gradient-to-r from-[#6B53FF] to-[#FEA611] hover:from-[#5B43EF] hover:to-[#E89501] text-white py-4 px-8 rounded-2xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5"
+                >
+                  <Mail className="w-5 h-5 mr-2" />
+                  Join the Waitlist
+                </Button>
                 
                 {((process.env.NEXT_PUBLIC_DEMO_DEEP_LINK as string) || (process.env.NEXT_PUBLIC_DEMO_URL as string)) && (
                   <Button
@@ -569,6 +581,12 @@ function WelcomeScreen() {
           </Card>
         </motion.section>
       </div>
+
+      {/* Waitlist Modal */}
+      <WaitlistModal 
+        isOpen={showWaitlistModal} 
+        onClose={() => setShowWaitlistModal(false)} 
+      />
     </div>
   )
 }
