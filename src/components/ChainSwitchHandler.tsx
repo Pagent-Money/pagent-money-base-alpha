@@ -4,13 +4,13 @@ import { ChainSwitchModal } from './ChainSwitchModal'
 import { useChainSwitchModal } from '../hooks/useChainSwitchModal'
 
 export function ChainSwitchHandler() {
-  const { isModalOpen, closeModal, onSwitchSuccess } = useChainSwitchModal()
+ const { isModalOpen, closeModal, onSwitchSuccess } = useChainSwitchModal()
 
-  return (
-    <ChainSwitchModal
-      isOpen={isModalOpen}
-      onClose={closeModal}
-      onSuccess={onSwitchSuccess}
-    />
-  )
+ return (
+  <ChainSwitchModal
+   isOpen={isModalOpen}
+   onClose={closeModal}
+   onSuccess={onSwitchSuccess}
+  />
+ )
 }

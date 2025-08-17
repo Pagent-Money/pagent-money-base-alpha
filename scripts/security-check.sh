@@ -1,79 +1,110 @@
 #!/bin/bash
 
-# Security Check Script
-# This script checks for potential secrets in the codebase before commits
-# 安全检查脚本 - 在提交前检查代码库中的潜在机密信息
+# Security check script to scan for sensitive information before commit
+# This script checks for common patterns of secrets, keys, and sensitive data
 
-echo "🔍 Running security checks..."
-echo "=================================="
+echo "🔒 Running security check for sensitive information..."
 
 # Colors for output
 RED='\033[0;31m'
-GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-# Track if any issues found
-issues_found=0
+# Counter for issues found
+ISSUES_FOUND=0
 
-# Check for hardcoded secrets patterns
-echo "📋 Checking for hardcoded secrets..."
+# Function to check for patterns in files
+check_pattern() {
+    local pattern="$1"
+    local description="$2"
+    local files="$3"
+    
+    echo "🔍 Checking for $description..."
+    
+    if [ -n "$files" ]; then
+        result=$(echo "$files" | xargs grep -l "$pattern" 2>/dev/null || true)
+        if [ -n "$result" ]; then
+            echo -e "${RED}❌ Found $description in:${NC}"
+            echo "$result" | while read -r file; do
+                echo "   - $file"
+                # Show the actual matches (first 3 lines)
+                grep -n "$pattern" "$file" | head -3 | sed 's/^/     /'
+            done
+            ISSUES_FOUND=$((ISSUES_FOUND + 1))
+            echo ""
+        fi
+    fi
+}
 
-# Stripe keys
-stripe_keys=$(grep -r "sk_\|pk_" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" src/ | grep -v "example\|demo\|test\|mock\|0x1234" | head -5)
-if [ ! -z "$stripe_keys" ]; then
-    echo -e "${RED}⚠️  Potential Stripe keys found:${NC}"
-    echo "$stripe_keys"
-    issues_found=$((issues_found + 1))
+# Get list of files to be committed (staged files) or all tracked files if none staged
+STAGED_FILES=$(git diff --cached --name-only 2>/dev/null || true)
+if [ -z "$STAGED_FILES" ]; then
+    # If no staged files, check all tracked files
+    FILES_TO_CHECK=$(git ls-files)
+    echo "📋 Checking all tracked files (no staged changes found)"
+else
+    FILES_TO_CHECK="$STAGED_FILES"
+    echo "📋 Checking staged files for commit"
 fi
 
-# API keys
-api_keys=$(grep -r "AKIA\|AIza" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" src/ | head -5)
-if [ ! -z "$api_keys" ]; then
-    echo -e "${RED}⚠️  Potential API keys found:${NC}"
-    echo "$api_keys"
-    issues_found=$((issues_found + 1))
-fi
+# Skip binary files and certain directories, and only check files that actually exist
+FILES_TO_CHECK=$(echo "$FILES_TO_CHECK" | grep -v -E '\.(png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|pdf|zip|tar|gz)$' | grep -v -E '^(node_modules|\.git|\.next|out|dist|build)/' | while read -r file; do [ -f "$file" ] && echo "$file"; done)
 
-# Private keys (excluding our mockup data)
-private_keys=$(grep -r "0x[a-fA-F0-9]{64}" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" src/ | grep -v "0x1234567890123456789012345678901234567890" | head -5)
-if [ ! -z "$private_keys" ]; then
-    echo -e "${RED}⚠️  Potential private keys found:${NC}"
-    echo "$private_keys"
-    issues_found=$((issues_found + 1))
-fi
+echo "Files to check: $(echo "$FILES_TO_CHECK" | wc -l)"
+echo ""
 
-# Check for .env files being tracked
-echo "📋 Checking for tracked environment files..."
-tracked_env=$(git ls-files | grep -E "\.env$|\.env\..*$" | grep -v "\.env\.example$")
-if [ ! -z "$tracked_env" ]; then
-    echo -e "${RED}⚠️  Environment files being tracked:${NC}"
-    echo "$tracked_env"
-    issues_found=$((issues_found + 1))
-fi
+# Check for various sensitive patterns
+check_pattern "sk_test_[a-zA-Z0-9]+" "Stripe test secret keys" "$FILES_TO_CHECK"
+check_pattern "sk_live_[a-zA-Z0-9]+" "Stripe live secret keys" "$FILES_TO_CHECK"
+check_pattern "pk_test_[a-zA-Z0-9]+" "Stripe test publishable keys" "$FILES_TO_CHECK"
+check_pattern "pk_live_[a-zA-Z0-9]+" "Stripe live publishable keys" "$FILES_TO_CHECK"
 
-# Check for common secret file patterns
-echo "📋 Checking for secret files..."
-secret_files=$(find . -name "*secret*" -o -name "*private*" -o -name "*.key" -o -name "*.pem" | grep -v node_modules | grep -v .git | head -10)
-if [ ! -z "$secret_files" ]; then
-    echo -e "${YELLOW}ℹ️  Files with secret-like names found (check if they should be in .gitignore):${NC}"
-    echo "$secret_files"
-fi
+# JWT tokens (but allow examples and documentation)
+check_pattern "eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*" "JWT tokens" "$FILES_TO_CHECK"
 
-# Check for large files that might contain secrets
-echo "📋 Checking for suspiciously large files..."
-large_files=$(find . -size +1M -type f | grep -v node_modules | grep -v .git | grep -v .next | head -5)
-if [ ! -z "$large_files" ]; then
-    echo -e "${YELLOW}ℹ️  Large files found (review for sensitive content):${NC}"
-    echo "$large_files"
-fi
+# Supabase service role keys (actual keys, not env var references)
+check_pattern "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*" "Supabase service role keys" "$FILES_TO_CHECK"
 
-# Summary
-echo "=================================="
-if [ $issues_found -eq 0 ]; then
-    echo -e "${GREEN}✅ No obvious security issues found!${NC}"
+# Private keys
+check_pattern "-----BEGIN PRIVATE KEY-----" "Private keys" "$FILES_TO_CHECK"
+check_pattern "-----BEGIN RSA PRIVATE KEY-----" "RSA private keys" "$FILES_TO_CHECK"
+
+# AWS credentials
+check_pattern "AKIA[0-9A-Z]{16}" "AWS access keys" "$FILES_TO_CHECK"
+
+# Long hex strings (potential private keys)
+check_pattern "0x[a-fA-F0-9]{64}" "64-character hex strings (potential private keys)" "$FILES_TO_CHECK"
+
+# Mnemonic phrases (12 or 24 words)
+check_pattern "\b([a-z]+\s+){11}[a-z]+\b" "Potential 12-word mnemonic phrases" "$FILES_TO_CHECK"
+check_pattern "\b([a-z]+\s+){23}[a-z]+\b" "Potential 24-word mnemonic phrases" "$FILES_TO_CHECK"
+
+# Database URLs with credentials
+check_pattern "postgresql://[^:]+:[^@]+@" "PostgreSQL URLs with credentials" "$FILES_TO_CHECK"
+check_pattern "mongodb://[^:]+:[^@]+@" "MongoDB URLs with credentials" "$FILES_TO_CHECK"
+
+# API keys in various formats
+check_pattern "['\"]?[A-Za-z0-9_-]{32,}['\"]?\s*[:=]\s*['\"][A-Za-z0-9_-]{32,}['\"]" "Potential API keys" "$FILES_TO_CHECK"
+
+# Check for hardcoded secrets in environment variable assignments
+check_pattern "SECRET[_A-Z]*\s*=\s*['\"][^'\"]{10,}['\"]" "Hardcoded secrets" "$FILES_TO_CHECK"
+check_pattern "PASSWORD[_A-Z]*\s*=\s*['\"][^'\"]{5,}['\"]" "Hardcoded passwords" "$FILES_TO_CHECK"
+check_pattern "TOKEN[_A-Z]*\s*=\s*['\"][^'\"]{10,}['\"]" "Hardcoded tokens" "$FILES_TO_CHECK"
+
+echo "🔍 Security check completed."
+
+if [ $ISSUES_FOUND -eq 0 ]; then
+    echo -e "${GREEN}✅ No sensitive information detected!${NC}"
     exit 0
 else
-    echo -e "${RED}❌ Found $issues_found potential security issues. Please review before committing.${NC}"
+    echo -e "${RED}❌ Found $ISSUES_FOUND potential security issues!${NC}"
+    echo -e "${YELLOW}⚠️  Please review and remove sensitive information before committing.${NC}"
+    echo ""
+    echo "💡 Tips:"
+    echo "   - Move secrets to environment variables"
+    echo "   - Use .env files (which are gitignored)"
+    echo "   - Remove hardcoded keys, tokens, and credentials"
+    echo "   - Use placeholder values in example files"
     exit 1
 fi

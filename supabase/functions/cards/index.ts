@@ -50,6 +50,8 @@ serve(async (req) => {
       )
     }
 
+    console.log('✅ JWT verified for user:', userInfo.wallet_address)
+
     // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

@@ -269,3 +269,47 @@ deployment-key*
 # Local development secrets
 local-secrets*
 dev-secrets*
+
+# Test scripts with hardcoded keys (should not be committed)
+scripts/test-*auth*.js
+scripts/test-*auth*.mjs
+scripts/test-*auth*.cjs
+scripts/setup-production.sh
+scripts/*-with-debug-logs.mjs
+scripts/insert-sample-data-simple.mjs
+scripts/create-sample-promos-data.mjs
+scripts/test-new-allowance-api.mjs
+
+# Any script files containing JWT tokens or API keys
+scripts/*jwt*
+scripts/*token*
+scripts/*key*
+scripts/*secret*
+
+# Debug and test files that may contain sensitive data
+*debug*.html
+*test*.html
+test-*.mjs
+test-*.js
+
+# Temporary development files
+*.dev.js
+*.dev.mjs
+*.temp.js
+*.temp.mjs
+
+# Documentation that may contain sensitive deployment info
+*DEPLOYMENT*.md
+*deployment*.md
+*SECURITY*.md
+*security*.md
+*API_INTEGRATION*.md
+*CREDIT_ASSIGNMENT*.md
+*FRONTEND_INTEGRATION*.md
+*NETWORK_DEBUGGING*.md
+*PROMOS_INTEGRATION*.md
+
+# Any markdown files with sensitive patterns
+*_SUMMARY.md
+*_REPORT.md
+*_GUIDE.md

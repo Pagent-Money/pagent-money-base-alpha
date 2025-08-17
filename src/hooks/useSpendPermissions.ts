@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAccount } from 'wagmi'
-import { SecureAPI } from '../lib/secure-auth'
+import { SecureAPI, callSecureFunction } from '../lib/secure-auth'
 import type { SpendPermission, SpendPermissionData } from '../types'
 
 /**
@@ -70,10 +70,17 @@ export function useSpendPermissions() {
       const token = sessionStorage.getItem('pagent_token')
       if (!token) throw new Error('Not authenticated')
       
-      const result = await SecureAPI.createPermission(token, {
-        permission: permissionData,
-        signature
-      })
+      // Convert SpendPermissionData to the format expected by the backend
+      const backendPermissionData = {
+        tokenAddress: permissionData.token,
+        capAmount: permissionData.cap,
+        periodSeconds: permissionData.period,
+        spenderAddress: permissionData.spender,
+        permissionSignature: signature,
+        mode: 'recurring' // Default to recurring mode for this hook
+      }
+      
+      const result = await SecureAPI.createPermission(token, backendPermissionData)
 
       if (result.success) {
         // Reload permissions to get the updated list
@@ -111,10 +118,13 @@ export function useSpendPermissions() {
       const token = sessionStorage.getItem('pagent_token')
       if (!token) throw new Error('Not authenticated')
       
-      // TODO: Implement revoke permission in secure API
-      const result = await SecureAPI.createPermission(token, {
-        action: 'revoke',
-        permissionId
+      // Call the dedicated revoke endpoint
+      const result = await callSecureFunction('permissions/revoke', token, {
+        method: 'POST',
+        body: JSON.stringify({
+          permission_id: permissionId,
+          smart_account: address
+        })
       })
 
       if (result.success) {
