@@ -43,6 +43,23 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    
+    if (!supabaseServiceKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is required for admin operations')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Server configuration error' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
     // Verify JWT token
     const authHeader = req.headers.get('Authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -79,10 +96,11 @@ serve(async (req) => {
       const { data: user, error: userError } = await supabase
         .from('users')
         .select('id, metadata')
-        .eq('smart_account', userInfo.wallet_address)
+        .or(`smart_account.eq.${userInfo.wallet_address},smart_account.eq.${userInfo.wallet_address.toLowerCase()},smart_account.ilike.${userInfo.wallet_address.toLowerCase()}`)
         .single()
 
       if (userError || !user) {
+        console.error('User lookup error:', userError)
         return new Response(
           JSON.stringify({ success: false, error: 'User not found' }),
           { 
@@ -92,64 +110,61 @@ serve(async (req) => {
         )
       }
 
-      // For now, we'll calculate rewards from user metadata and receipts
-      // In a production system, you'd have dedicated rewards/cashback tables
+      console.log('✅ Found user:', user.id)
 
-      // Get user's completed transactions for cashback calculation
-      const { data: receipts, error: receiptsError } = await supabase
-        .from('receipts')
-        .select('id, amount, merchant, created_at, metadata')
+      // Get user's rewards balance
+      const { data: userRewards, error: rewardsError } = await supabase
+        .from('user_rewards')
+        .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false })
-        .limit(100)
+        .single()
 
-      if (receiptsError) {
-        console.error('Error fetching receipts for rewards:', receiptsError)
+      let balance = 0
+      let points = 0
+      if (userRewards && !rewardsError) {
+        balance = parseFloat(userRewards.cashback_balance) || 0
+        points = userRewards.points_balance || 0
       }
 
-      // Calculate cashback (example: 1% on all transactions)
-      const cashback: CashbackEntry[] = (receipts || []).map(receipt => {
-        const amount = parseFloat(receipt.amount)
-        const cashbackAmount = amount * 0.01 // 1% cashback
-        return {
-          id: `cashback_${receipt.id}`,
-          transaction_id: receipt.id,
-          amount: cashbackAmount,
-          percentage: 1.0,
-          merchant: receipt.merchant,
-          earned_at: receipt.created_at,
-          status: 'credited' as const
-        }
-      })
+      // Get cashback transactions
+      const { data: cashbackTransactions, error: cashbackError } = await supabase
+        .from('cashback_transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('transaction_date', { ascending: false })
+        .limit(50)
 
-      // Calculate total rewards
-      const balance = cashback.reduce((sum, cb) => sum + cb.amount, 0)
-      const points = Math.floor(balance * 100) // Convert dollars to points (100 points = $1)
+      const cashback: CashbackEntry[] = (cashbackTransactions || []).map(tx => ({
+        id: tx.id,
+        transaction_id: tx.transaction_id || tx.id,
+        amount: parseFloat(tx.cashback_amount),
+        percentage: parseFloat(tx.cashback_rate) || 0,
+        merchant: tx.merchant || 'Unknown',
+        earned_at: tx.transaction_date,
+        status: tx.status === 'credited' ? 'credited' : 
+                tx.status === 'pending' ? 'pending' : 'expired'
+      }))
 
-      // Sample promos (in production, these would come from a promos table)
-      const promos: PromoEntry[] = [
-        {
-          id: 'promo_welcome',
-          title: '🎉 Welcome Bonus',
-          description: 'Get 5% cashback on your first 10 transactions',
-          reward_type: 'cashback',
-          reward_value: 5.0,
-          conditions: 'First 10 transactions only',
-          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-          status: 'active'
-        },
-        {
-          id: 'promo_grocery',
-          title: '🛒 Grocery Rewards',
-          description: 'Extra 2% cashback on grocery purchases',
-          reward_type: 'cashback',
-          reward_value: 2.0,
-          conditions: 'Grocery stores only',
-          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
-          status: 'active'
-        }
-      ]
+      // Get active promos
+      const { data: activePromos, error: promosError } = await supabase
+        .from('promos')
+        .select('*')
+        .eq('status', 'active')
+        .order('priority', { ascending: false })
+        .limit(10)
+
+      const promos: PromoEntry[] = (activePromos || []).map(promo => ({
+        id: promo.id,
+        title: promo.title,
+        description: promo.description,
+        reward_type: promo.reward_type,
+        reward_value: parseFloat(promo.reward_value),
+        conditions: promo.conditions || '',
+        expires_at: promo.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        status: 'active'
+      }))
+
+      console.log(`✅ Loaded ${cashback.length} cashback transactions and ${promos.length} promos`)
 
       const rewardsData: RewardsData = {
         balance: Math.round(balance * 100) / 100, // Round to 2 decimal places

@@ -5,6 +5,7 @@
 
 import { SiweMessage } from 'siwe'
 import { createClient } from '@supabase/supabase-js'
+import { getAddress } from 'viem'
 
 // Supabase configuration
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://rpsfupahfggkpfstaxfx.supabase.co'
@@ -36,9 +37,37 @@ export function createSiweMessage(
   // SIWE spec expects the RFC3986 host (no port). Use hostname instead of host to avoid :3000 in dev
   domain: string = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
 ): SiweMessage {
+  // Normalize address to proper EIP-55 checksum format
+  let normalizedAddress: string
+  try {
+    normalizedAddress = getAddress(address)
+    console.log('📍 Address normalized:', { original: address, normalized: normalizedAddress })
+  } catch (error) {
+    console.warn('⚠️ Address normalization failed, trying to fix:', address, error.message)
+    
+    // Try to fix common address format issues
+    let fixedAddress = address
+    
+    // If address is too short, pad with zeros
+    if (address.length < 42) {
+      const hexPart = address.slice(2) // Remove 0x
+      const paddedHex = hexPart.padStart(40, '0')
+      fixedAddress = '0x' + paddedHex
+      console.log('🔧 Padded short address:', { original: address, padded: fixedAddress })
+    }
+    
+    try {
+      normalizedAddress = getAddress(fixedAddress)
+      console.log('✅ Address fixed and normalized:', { original: address, fixed: fixedAddress, normalized: normalizedAddress })
+    } catch (fixError) {
+      console.error('❌ Could not fix address format:', address, fixError)
+      throw new Error(`Invalid Ethereum address format: ${address}. Please check your wallet connection.`)
+    }
+  }
+
   const message = new SiweMessage({
     domain,
-    address,
+    address: normalizedAddress,
     statement: 'Sign in to Pagent Credits with your wallet.',
     uri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
     version: '1',
@@ -88,36 +117,54 @@ export async function authenticateWithSiwe(
     console.log('Signature preview:', signature.substring(0, 20) + '...')
     console.log('=====================================')
     
-    // Test local verification to help diagnose issues
-    try {
-      const localTest = await siweMessage.verify({ signature })
-      console.log('🧪 Frontend local verification result:', localTest)
-      if (localTest && (localTest === true || localTest.success)) {
-        console.log('✅ Local verification passed - issue may be in backend')
+    // Skip local verification for ERC-6492 signatures (Coinbase Smart Wallet)
+    const isERC6492Signature = signature.length > 1000 && signature.startsWith('0x00000000')
+    
+    if (isERC6492Signature) {
+      console.log('🏦 Detected ERC-6492 signature - skipping frontend verification')
+      console.log('⚡ Sending directly to backend for specialized ERC-6492 verification')
+    } else {
+      // Test local verification for standard signatures only
+      try {
+        const localTest = await siweMessage.verify({ signature })
+        console.log('🧪 Frontend local verification result:', localTest)
+        if (localTest && (localTest === true || localTest.success)) {
+          console.log('✅ Local verification passed - issue may be in backend')
+        }
+      } catch (localError) {
+        console.log('🧪 Frontend local verification error:', localError.message)
+        console.log('⚠️ This may indicate a signature that needs backend EIP-1271 verification')
       }
-    } catch (localError) {
-      console.log('🧪 Frontend local verification error:', localError.message)
-      console.log('⚠️ This may indicate a Coinbase Smart Wallet signature that needs EIP-1271 verification')
     }
 
     // Send to our Edge Function for verification and user management
-    const response = await fetch(`${EDGE_FUNCTIONS_URL}/siwe-auth`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
-      body: JSON.stringify({
-        message,
-        signature,
-        timestamp: Date.now(),
-        clientInfo: {
-          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'SSR',
-          platform: 'coinbase-wallet',
-          version: '1.0.0'
-        }
-      }),
-    })
+    let response: Response
+    try {
+      response = await fetch(`${EDGE_FUNCTIONS_URL}/siwe-auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          message,
+          signature,
+          timestamp: Date.now(),
+          clientInfo: {
+            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'SSR',
+            platform: 'coinbase-wallet',
+            version: '1.0.0'
+          }
+        }),
+      })
+    } catch (networkError) {
+      console.error('🌐 Network error during authentication:', networkError)
+      throw new Error(
+        'Network connection failed. Please check your internet connection and try again.\n' +
+        'If the problem persists, the authentication service may be temporarily unavailable.'
+      )
+    }
 
     if (!response.ok) {
       const errorText = await response.text()
@@ -191,18 +238,27 @@ export async function authenticateWithSiwe(
 
 /**
  * Generate a secure nonce for SIWE
+ * SIWE nonce should be at least 8 characters and alphanumeric
  */
 export function generateNonce(): string {
-  const array = new Uint8Array(32)
+  // Generate a shorter, alphanumeric nonce that meets SIWE requirements
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  
   if (typeof window !== 'undefined' && window.crypto) {
+    const array = new Uint8Array(16) // 16 bytes for good randomness
     window.crypto.getRandomValues(array)
+    for (let i = 0; i < array.length; i++) {
+      result += chars[array[i] % chars.length]
+    }
   } else {
     // Fallback for server-side
-    for (let i = 0; i < array.length; i++) {
-      array[i] = Math.floor(Math.random() * 256)
+    for (let i = 0; i < 16; i++) {
+      result += chars[Math.floor(Math.random() * chars.length)]
     }
   }
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+  
+  return result
 }
 
 /**
@@ -212,9 +268,10 @@ export function storeSiweSession(session: SiweSession): void {
   if (typeof window === 'undefined') return
   
   try {
-    sessionStorage.setItem('pagent-siwe-token', session.access_token)
-    sessionStorage.setItem('pagent-siwe-user', JSON.stringify(session.user))
-    sessionStorage.setItem('pagent-siwe-expires', session.expires_at.toString())
+    // Use localStorage instead of sessionStorage for persistence across tabs/refreshes
+    localStorage.setItem('pagent-siwe-token', session.access_token)
+    localStorage.setItem('pagent-siwe-user', JSON.stringify(session.user))
+    localStorage.setItem('pagent-siwe-expires', session.expires_at.toString())
   } catch (error) {
     console.error('Error storing SIWE session:', error)
   }
@@ -227,9 +284,9 @@ export function getStoredSiweSession(): SiweSession | null {
   if (typeof window === 'undefined') return null
   
   try {
-    const token = sessionStorage.getItem('pagent-siwe-token')
-    const userStr = sessionStorage.getItem('pagent-siwe-user')
-    const expiresStr = sessionStorage.getItem('pagent-siwe-expires')
+    const token = localStorage.getItem('pagent-siwe-token')
+    const userStr = localStorage.getItem('pagent-siwe-user')
+    const expiresStr = localStorage.getItem('pagent-siwe-expires')
     
     if (!token || !userStr || !expiresStr) return null
     
@@ -262,9 +319,9 @@ export function clearSiweSession(): void {
   if (typeof window === 'undefined') return
   
   try {
-    sessionStorage.removeItem('pagent-siwe-token')
-    sessionStorage.removeItem('pagent-siwe-user')
-    sessionStorage.removeItem('pagent-siwe-expires')
+    localStorage.removeItem('pagent-siwe-token')
+    localStorage.removeItem('pagent-siwe-user')
+    localStorage.removeItem('pagent-siwe-expires')
   } catch (error) {
     console.error('Error clearing SIWE session:', error)
   }

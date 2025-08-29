@@ -189,13 +189,14 @@ export async function callSecureFunction(
     })
 
     if (response.status === 401) {
-      console.warn('🔑 Token expired, redirecting to auth...')
-      // Clear stored auth and redirect
+      console.warn('🔑 Token expired or invalid')
+      // Clear stored auth but don't redirect - let the page handle it
       if (typeof window !== 'undefined') {
         sessionStorage.clear()
-        window.location.href = '/'
+        localStorage.removeItem('pagent_session')
+        localStorage.removeItem('pagent_token')
       }
-      throw new Error('Session expired')
+      throw new Error('Session expired. Please reconnect your wallet and sign in again.')
     }
 
     if (!response.ok) {
@@ -272,10 +273,99 @@ function getMockResponse(functionName: string): any {
       return {
         success: true,
         data: {
-          balance: 0,
-          points: 0,
-          cashback: [],
-          promos: []
+          balance: 25.50,
+          points: 1250,
+          cashback: [
+            {
+              id: 'cashback_1',
+              transaction_id: 'tx_grocery_001',
+              amount: 2.57,
+              percentage: 3.0,
+              merchant: 'Whole Foods Market',
+              earned_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'credited'
+            },
+            {
+              id: 'cashback_2',
+              transaction_id: 'tx_gas_001',
+              amount: 0.90,
+              percentage: 2.0,
+              merchant: 'Shell Gas Station',
+              earned_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'credited'
+            },
+            {
+              id: 'cashback_3',
+              transaction_id: 'tx_food_001',
+              amount: 1.31,
+              percentage: 4.0,
+              merchant: 'DoorDash',
+              earned_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'pending'
+            }
+          ],
+          promos: [
+            {
+              id: 'promo_welcome',
+              title: '🎉 Welcome Bonus',
+              description: 'Get 5% cashback on your first 10 transactions with Pagent Credits',
+              reward_type: 'cashback',
+              reward_value: 5.0,
+              conditions: 'Valid for first 10 transactions only',
+              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active'
+            },
+            {
+              id: 'promo_grocery',
+              title: '🛒 Grocery Rewards',
+              description: 'Extra 3% cashback on all grocery store purchases',
+              reward_type: 'cashback',
+              reward_value: 3.0,
+              conditions: 'Valid at participating grocery stores',
+              expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active'
+            },
+            {
+              id: 'promo_gas',
+              title: '⛽ Gas Station Cashback',
+              description: '2% cashback on all gas station purchases',
+              reward_type: 'cashback',
+              reward_value: 2.0,
+              conditions: 'Valid at all gas stations',
+              expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active'
+            },
+            {
+              id: 'promo_food',
+              title: '🍕 Food Delivery Bonus',
+              description: '4% cashback on food delivery services',
+              reward_type: 'cashback',
+              reward_value: 4.0,
+              conditions: 'Valid on DoorDash, Uber Eats, Grubhub',
+              expires_at: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active'
+            },
+            {
+              id: 'promo_gaming',
+              title: '🎮 Gaming Rewards',
+              description: 'Earn 500 bonus points on gaming purchases over $50',
+              reward_type: 'points',
+              reward_value: 500,
+              conditions: 'Minimum purchase $50 on gaming platforms',
+              expires_at: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active'
+            },
+            {
+              id: 'promo_premium',
+              title: '💎 Premium Member Exclusive',
+              description: 'Double cashback on all purchases for premium members',
+              reward_type: 'bonus',
+              reward_value: 2.0,
+              conditions: 'Premium membership required',
+              expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+              status: 'active'
+            }
+          ]
         }
       }
     

@@ -78,11 +78,16 @@ export function useChainFromUrl() {
 
   // Function to remove chain parameter from URL
   const clearChainFromUrl = () => {
+    // Only clear if there's actually a chain parameter to remove
+    if (!searchParams.get(CHAIN_PARAM_KEY)) {
+      return
+    }
+    
     const params = new URLSearchParams(searchParams.toString())
     params.delete(CHAIN_PARAM_KEY)
     
     const queryString = params.toString()
-    router.push(queryString ? `?${queryString}` : '/', { scroll: false })
+    router.push(queryString ? `?${queryString}` : window.location.pathname, { scroll: false })
     setSelectedChain(null)
     
     console.log('🧹 Cleared chain override from URL')

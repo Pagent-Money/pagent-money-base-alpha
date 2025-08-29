@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react'
 
 interface ClientOnlyProps {
-  children: React.ReactNode
-  fallback?: React.ReactNode
+ children: React.ReactNode
+ fallback?: React.ReactNode
 }
 
 /**
@@ -12,15 +12,15 @@ interface ClientOnlyProps {
  * 仅客户端包装器，防止水合不匹配
  */
 export function ClientOnly({ children, fallback = null }: ClientOnlyProps) {
-  const [hasMounted, setHasMounted] = useState(false)
+ const [hasMounted, setHasMounted] = useState(false)
 
-  useEffect(() => {
-    setHasMounted(true)
-  }, [])
+ useEffect(() => {
+  setHasMounted(true)
+ }, [])
 
-  if (!hasMounted) {
-    return <>{fallback}</>
-  }
+ if (!hasMounted) {
+  return <>{fallback}</>
+ }
 
-  return <>{children}</>
+ return <>{children}</>
 }
